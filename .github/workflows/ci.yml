@@ -1,0 +1,92 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint · typecheck · unit + property tests · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Tests (fast-check runs 1000 cases per property in CI)
+        run: npx vitest run --coverage
+        env:
+          FC_RUNS: "1000"
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: dist-web
+
+  e2e:
+    name: browser e2e (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx playwright test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+
+  docker:
+    name: docker image smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t crdt-collab:ci .
+      - run: |
+          docker run -d --name crdt -p 8787:8787 crdt-collab:ci
+          for i in $(seq 1 30); do curl -fs localhost:8787/healthz && break; sleep 1; done
+          curl -fs localhost:8787/ | grep -q 'CRDT//COLLAB'
+          curl -fs localhost:8787/api/rooms
+      - if: always()
+        run: docker logs crdt || true
+
+  pages:
+    name: deploy demo to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: dist-web
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-web
+      - id: deploy
+        uses: actions/deploy-pages@v4

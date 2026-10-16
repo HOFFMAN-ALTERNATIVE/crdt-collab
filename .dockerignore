@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-web
+coverage
+data
+.e2e-data
+test-results
+playwright-report
+.git
+.github

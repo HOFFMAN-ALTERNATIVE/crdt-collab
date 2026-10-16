@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CRDT//COLLAB — realtime collaboration on a from-scratch CRDT</title>
+    <meta name="description" content="Collaborative text and whiteboard built on a from-scratch RGA sequence CRDT and LWW map. Simulated peers, offline edits, deterministic merge." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M4 4h24v24H4z' fill='none' stroke='%2300e5ff' stroke-width='3'/><path d='M10 16h12M16 10v12' stroke='%23ff2bd6' stroke-width='3'/></svg>" />
+  </head>
+  <body>
+    <div class="scanlines" aria-hidden="true"></div>
+    <header class="hud">
+      <div class="brand">
+        <h1>CRDT<span>//</span>COLLAB</h1>
+        <p id="mode">booting…</p>
+      </div>
+      <div id="status" class="status" role="status" aria-live="polite">—</div>
+    </header>
+
+    <nav class="controls" aria-label="Network controls">
+      <label class="ctl sim-only">LATENCY
+        <input id="latency" type="range" min="0" max="2000" step="10" value="150" />
+        <output id="latency-out">150 ms</output>
+      </label>
+      <label class="ctl sim-only"><input id="jitter" type="checkbox" /> JITTER <small>(reorders packets)</small></label>
+      <label class="ctl"><input id="chaos" type="checkbox" /> CHAOS MONKEY</label>
+      <button id="partition" class="btn warn">PARTITION ALL</button>
+      <button id="heal" class="btn ok">RECONNECT ALL</button>
+      <button id="add" class="btn">+ PEER</button>
+      <button id="reset" class="btn ghost sim-only" title="Clear the locally persisted room">RESET ROOM</button>
+    </nav>
+
+    <main id="peers" class="peers" data-count="0"></main>
+
+    <footer class="about">
+      <p>
+        From-scratch <b>RGA</b> sequence CRDT for text + <b>LWW</b> registers for the whiteboard, Lamport clocks,
+        version-vector delta sync, causal buffering, presence. No CRDT libraries.
+        <a href="https://github.com/HOFFMAN-ALTERNATIVE/crdt-collab">Source &amp; design notes →</a>
+      </p>
+    </footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

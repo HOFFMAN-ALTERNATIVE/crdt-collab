@@ -1,0 +1,46 @@
+{
+  "name": "crdt-collab",
+  "version": "1.0.0",
+  "description": "Realtime collaborative text + whiteboard on a from-scratch CRDT (RGA sequence + LWW map) with WebSocket sync, presence and offline merge.",
+  "license": "MIT",
+  "author": "Herman Hoffman",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "tsx watch src/server/main.ts",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:web": "vite build",
+    "start": "node dist/server/main.js",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^20.19.0",
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "4.1.12",
+    "eslint": "^9.39.0",
+    "fast-check": "4.10.2",
+    "globals": "^16.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.71.2",
+    "vite": "7.3.7",
+    "vitest": "4.1.12"
+  }
+}
