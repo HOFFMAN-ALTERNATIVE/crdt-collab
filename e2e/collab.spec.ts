@@ -24,7 +24,16 @@ test('simulated peers merge offline edits and whiteboard moves', async ({ page }
   await typeAtEnd(page, 0, ' + Ada meanwhile');
 
   const note = peer(page, 0).locator('[data-shape="seed-note"]');
-  const box = (await note.boundingBox())!;
+  // The board replaces its SVG nodes on re-render, so a locator handle can
+  // detach between "find" and "measure". Read the rect in one evaluate call
+  // and poll until the note is laid out.
+  const rect = () =>
+    peer(page, 0).evaluate((el) => {
+      const r = el.querySelector('[data-shape="seed-note"]')?.getBoundingClientRect();
+      return r && r.width > 0 ? { x: r.x, y: r.y } : null;
+    });
+  await expect.poll(rect).not.toBeNull();
+  const box = (await rect())!;
   await page.mouse.move(box.x + 20, box.y + 20);
   await page.mouse.down();
   await page.mouse.move(box.x + 160, box.y + 80, { steps: 6 });
