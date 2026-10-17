@@ -7,17 +7,15 @@
 ![fast-check](https://img.shields.io/badge/property%20tests-fast--check-00e5ff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**Realtime collaborative text + whiteboard on a CRDT written from scratch** — no
-Yjs, no Automerge. An RGA sequence CRDT for text, LWW registers for the
-whiteboard, Lamport clocks, version-vector delta sync, causal buffering,
-presence (live carets and pointers), offline editing with conflict-free merge,
-a hardened WebSocket sync server, and a dark HUD front-end.
+Several people edit the same text and whiteboard at once, online or offline, and every replica ends up identical without a central server deciding the order. The CRDT is written from scratch (no Yjs, no Automerge): an RGA sequence for text, field-level LWW registers for shapes, Lamport clocks, version-vector delta sync and a causal buffer for out-of-order delivery. A WebSocket relay server, live presence and a HUD-style front-end sit on top.
 
-### ▶ [Live demo](https://hoffman-alternative.github.io/crdt-collab/)
+Convergence is property-tested, not assumed. fast-check generates random histories for 2 to 4 replicas with partial, duplicated and reordered delivery (1000 cases per property in CI) and asserts identical state afterwards. Breaking the RGA skip rule makes it produce a minimal counterexample within a few runs.
+
+### [Live demo](https://hoffman-alternative.github.io/crdt-collab/)
 
 The demo runs several simulated peers side by side in one page over a
 simulated network you can sabotage: add latency, enable jitter (packets arrive
-out of order), cut peers off, let a chaos monkey type and flap links — then
+out of order), cut peers off, let a chaos monkey type and flap links, then
 watch every replica converge to the same fingerprint. Open it in a second tab
 and the tabs sync too (BroadcastChannel).
 
@@ -27,13 +25,13 @@ and the tabs sync too (BroadcastChannel).
 This project implements the core ideas directly, small enough to read in one
 sitting and tested hard enough to trust:
 
-- **Strong eventual consistency** — replicas that have seen the same set of
+- **Strong eventual consistency.** Replicas that have seen the same set of
   operations are identical, regardless of order, duplication or delay. Proven
   with property-based tests over thousands of random multi-replica histories.
-- **Offline-first** — edits made while disconnected are just ops in the local
+- **Offline-first.** Edits made while disconnected are just ops in the local
   log; reconnecting exchanges version vectors and ships exactly the missing
   ops in both directions.
-- **Intention preservation** — concurrent runs of text typed at the same spot
+- **Intention preservation.** Concurrent runs of text typed at the same spot
   never interleave character-by-character; a deleted character still anchors
   later inserts and remote carets.
 
@@ -77,7 +75,7 @@ flowchart LR
 The same symmetric protocol (`hello` / `ops` / `awareness`) runs over every
 transport: in-memory links, BroadcastChannel and WebSocket. A hub is just
 another replica that relays the ops it has not seen before, so it never needs
-to understand edits — no operational transformation on the server.
+to understand edits; no operational transformation on the server.
 
 ### Sync handshake (incl. offline merge)
 
@@ -103,7 +101,7 @@ id `(clock, client)` greater than anything its author has seen. To integrate
 an insert, start right after the reference and **skip every node whose id is
 greater than the new one**. Because descendants always carry larger ids than
 their ancestors, this skips entire subtrees of newer concurrent inserts and
-stops at the same slot on every replica — whatever the arrival order. Deletes
+stops at the same slot on every replica, whatever the arrival order. Deletes
 only flip a tombstone flag, so later inserts can still reference the
 character. See [`src/crdt/rga.ts`](src/crdt/rga.ts).
 
@@ -138,7 +136,9 @@ test/          Vitest unit + fast-check property tests + server integration
 e2e/           Playwright browser tests (sim, multi-tab, WebSocket)
 ```
 
-## Design decisions & trade-offs
+## Design decisions and trade-offs
+
+ADRs: [0001 RGA CRDT instead of operational transformation](docs/adr/0001-rga-crdt-over-ot.md), [0002 no tombstone garbage collection](docs/adr/0002-no-tombstone-gc.md), [0003 the server keeps a full replica](docs/adr/0003-server-keeps-a-replica.md).
 
 - **RGA over OT.** Operational transformation needs a central server to order
   and transform operations; a CRDT lets any replica merge anything, which is
@@ -148,7 +148,7 @@ e2e/           Playwright browser tests (sim, multi-tab, WebSocket)
 - **Flat array + index instead of a tree.** Integration is O(n) per character,
   fine for documents of tens of thousands of characters and easy to verify.
   Yjs/Automerge-scale performance needs run-length-encoded items and a B-tree
-  or skip list — a contained change behind the same `Rga` API.
+  or skip list, a contained change behind the same `Rga` API.
 - **No tombstone GC.** Safe garbage collection requires knowing that every
   replica has seen a delete (causal stability); with offline peers that is
   unknowable without membership tracking. The op log can be compacted into a
@@ -180,8 +180,8 @@ FC_RUNS=5000 npm test   # crank up the property tests
 ```
 
 Property-based tests ([`test/convergence.property.test.ts`](test/convergence.property.test.ts)) generate
-random histories for 2–4 replicas — inserts, deletes, map writes and shape
-edits interleaved with partial, duplicated and out-of-order deliveries — and
+random histories for 2–4 replicas (inserts, deletes, map writes and shape
+edits interleaved with partial, duplicated and out-of-order deliveries) and
 assert:
 
 1. **Convergence:** after draining the network in a random order, all replicas
@@ -200,6 +200,22 @@ Server integration tests run real WebSocket clients: three-way concurrent +
 offline merge, room isolation, presence relay, persistence across restarts,
 and rejection of malformed messages, missing handshakes and floods.
 
+## Limits
+
+- Integration is O(n) per character over a flat array. Comfortable up to tens of thousands of characters per document; book-length documents need run-length items and a tree.
+- Tombstones are never collected (ADR 0002), so a heavily edited document only grows.
+- No authentication or per-room access control. Anyone who knows a room name can join it. `ALLOWED_ORIGINS` restricts which sites may open the WebSocket, but it is not auth.
+- One server process. Rooms live in its memory and snapshot to `DATA_DIR`; there is no clustering.
+- JSON on the wire. A binary encoding would cut bandwidth several times; not done yet.
+
+## Operations
+
+- `GET /healthz` backs the image's Docker `HEALTHCHECK`. SIGTERM closes WebSocket connections and the HTTP server before exit.
+- Per-connection token bucket (200 msg/s, burst 400), 1 MiB max message, 30 s ping heartbeat, at most 1000 rooms (`MAX_ROOMS`), one room per connection, strict message validation.
+- Runs as the unprivileged `node` user on Node 24 (Node 20 reached end of life in April 2026).
+
+Security reporting and threat model: [SECURITY.md](SECURITY.md).
+
 ## Container image
 
 Multi-arch (amd64/arm64) images are published to GitHub Container Registry on every release:
@@ -210,4 +226,4 @@ docker pull ghcr.io/hoffman-alternative/crdt-collab:latest
 
 ## License
 
-[MIT](LICENSE) © Herman Hoffman
+[MIT](LICENSE)

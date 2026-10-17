@@ -160,4 +160,23 @@ describe('WebSocket sync server', () => {
     const health = await fetch(`http://127.0.0.1:${server.port}/healthz`);
     expect(health.status).toBe(200);
   });
+
+  it('refuses new rooms past maxRooms but still admits existing ones', async () => {
+    server = await startServer({ port: 0, host: '127.0.0.1', maxRooms: 1 });
+    const hello = (room: string) =>
+      new Promise<number | 'open'>((resolve) => {
+        const ws = new WebSocket(server!.url);
+        ws.on('open', () => {
+          ws.send(JSON.stringify({ type: 'hello', room, client: `c-${room}`, vv: {}, reply: false }));
+          setTimeout(() => {
+            ws.close();
+            resolve('open');
+          }, 200);
+        });
+        ws.on('close', (code) => resolve(code));
+      });
+    expect(await hello('first')).toBe('open');
+    expect(await hello('second')).toBe(1013);
+    expect(await hello('first')).toBe('open');
+  });
 });

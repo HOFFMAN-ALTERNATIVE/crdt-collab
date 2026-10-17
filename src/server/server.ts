@@ -21,6 +21,8 @@ export interface ServerOptions {
   burst?: number;
   heartbeatMs?: number;
   presenceTimeoutMs?: number;
+  /** Rooms are created on first hello; cap them so clients cannot exhaust memory. */
+  maxRooms?: number;
   /** Allowed Origin values for WebSocket upgrades (empty = any). */
   allowedOrigins?: string[];
   log?: (msg: string, extra?: Record<string, unknown>) => void;
@@ -108,6 +110,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       if (msg.type === 'hello') {
         if (room && room.name !== msg.room) return ws.close(1008, 'one room per connection');
         if (!room) {
+          if (!hub.rooms.has(msg.room) && hub.rooms.size >= (opts.maxRooms ?? 1000)) {
+            conn.send({ type: 'error', message: 'room limit reached' });
+            return ws.close(1013, 'room limit reached');
+          }
           room = hub.room(msg.room);
           room.join(conn);
           log('join', { room: room.name, conn: id, peers: room.conns.size });

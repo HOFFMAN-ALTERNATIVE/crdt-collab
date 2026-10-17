@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build && npm prune --omit=dev
 
-FROM node:20-alpine
+FROM node:24-alpine
 ENV NODE_ENV=production PORT=8787 DATA_DIR=/data STATIC_DIR=/app/dist-web
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules

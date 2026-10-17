@@ -8,6 +8,7 @@ const server = await startServer({
   host: process.env.HOST ?? '0.0.0.0',
   dataDir: process.env.DATA_DIR ?? 'data',
   staticDir,
+  maxRooms: Number(process.env.MAX_ROOMS ?? 1000),
   allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',').filter(Boolean) ?? [],
   log: (msg, extra) => console.log(JSON.stringify({ time: new Date().toISOString(), msg, ...extra })),
 });
