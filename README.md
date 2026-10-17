@@ -200,6 +200,14 @@ Server integration tests run real WebSocket clients: three-way concurrent +
 offline merge, room isolation, presence relay, persistence across restarts,
 and rejection of malformed messages, missing handshakes and floods.
 
+## Container image
+
+Multi-arch (amd64/arm64) images are published to GitHub Container Registry on every release:
+
+```bash
+docker pull ghcr.io/hoffman-alternative/crdt-collab:latest
+```
+
 ## License
 
 [MIT](LICENSE) © Herman Hoffman
